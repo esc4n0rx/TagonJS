@@ -1,17 +1,23 @@
 {
   "name": "tagonjs",
-  "version": "1.0.0", 
-  "description": "Sistema educativo de banco de dados com comandos em português simples",
-  "main": "src/cli.js",
+  "version": "2.0.0", 
+  "description": "Sistema educativo de banco de dados com comandos em português - versão avançada com SELECT, JOIN e mais",
+  "main": "src/cli-new.js",
   "scripts": {
-    "start": "node src/cli.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node src/cli-new.js",
+    "start-old": "node src/cli.js",
+    "test": "node test-complete.js",
+    "test-parser": "node test-parser.js",
+    "dev": "nodemon src/cli-new.js"
   },
-  "keywords": ["database", "xml", "cli", "educativo", "português"],
+  "keywords": ["database", "xml", "cli", "educativo", "português", "sql", "parser", "join"],
   "author": "TagonJS",
   "license": "MIT",
   "dependencies": {
     "fast-xml-parser": "^5.2.5",
     "chalk": "^4.1.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
   }
 }

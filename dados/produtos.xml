@@ -1,0 +1,13 @@
+<banco nome="produtos" criado="2025-06-20T18:03:26.574Z">
+  <tabelas>
+    <produtos criada="2025-06-20T18:07:32.625Z">
+      <colunas>
+        <id tipo="numero" constraints=""></id>
+        <nome tipo="texto" constraints=""></nome>
+        <preco tipo="numero" constraints=""></preco>
+        <categoria tipo="texto" constraints=""></categoria>
+      </colunas>
+      <registros></registros>
+    </produtos>
+  </tabelas>
+</banco>
