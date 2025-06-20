@@ -1,0 +1,59 @@
+<banco nome="constraint_test" criado="2025-06-20T18:39:34.152Z">
+  <tabelas>
+    <usuarios criada="2025-06-20T18:39:34.162Z">
+      <colunas>
+        <id tipo="numero" constraints="AUTO_INCREMENT,PRIMARY_KEY"></id>
+        <email tipo="texto" constraints="UNIQUE,NOT_NULL"></email>
+        <nome tipo="texto" constraints="NOT_NULL"></nome>
+        <idade tipo="numero" constraints="DEFAULT:18"></idade>
+        <uuid_user tipo="uuid" constraints=""></uuid_user>
+      </colunas>
+      <registros>
+        <reg_1>
+          <email>joao@email.com</email>
+          <nome>joão</nome>
+          <id>1</id>
+          <idade>18</idade>
+          <uuid_user>c3a0220b-7e26-4a43-8b03-6e73b6fe2cdd</uuid_user>
+        </reg_1>
+        <reg_2>
+          <email>maria@email.com</email>
+          <nome>maria</nome>
+          <idade>25</idade>
+          <id>2</id>
+          <uuid_user>7e923fc7-2bd9-4526-8b42-28310b5b1506</uuid_user>
+        </reg_2>
+      </registros>
+    </usuarios>
+    <posts criada="2025-06-20T18:39:34.165Z">
+      <colunas>
+        <id tipo="numero" constraints="AUTO_INCREMENT,PRIMARY_KEY"></id>
+        <titulo tipo="texto" constraints="NOT_NULL"></titulo>
+        <conteudo tipo="texto" constraints=""></conteudo>
+        <usuario_id tipo="numero" constraints=""></usuario_id>
+      </colunas>
+      <registros>
+        <reg_1>
+          <titulo>primeiro post</titulo>
+          <conteudo>conteúdo</conteudo>
+          <usuario_id>1</usuario_id>
+          <id>1</id>
+        </reg_1>
+        <reg_2>
+          <titulo>post inválido</titulo>
+          <conteudo>conteúdo</conteudo>
+          <usuario_id>999</usuario_id>
+          <id>2</id>
+        </reg_2>
+      </registros>
+      <constraints>
+        <type>FOREIGN_KEY</type>
+        <columnName>usuario_id</columnName>
+        <options>
+          <referencedTable>usuarios</referencedTable>
+          <referencedColumn>id</referencedColumn>
+        </options>
+      </constraints>
+    </posts>
+  </tabelas>
+</banco>

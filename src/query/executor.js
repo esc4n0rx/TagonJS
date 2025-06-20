@@ -337,51 +337,42 @@ class QueryExecutor {
   }
 
   async executeInsert(ast) {
-    if (!this.currentDatabase) {
-      throw new Error('Nenhum banco selecionado');
-    }
-
-    const tableData = await this.storageManager.loadTable(
-      this.currentDatabase, 
-      ast.tableName
-    );
-
-    if (!tableData) {
-      throw new Error(`Tabela '${ast.tableName}' não encontrada`);
-    }
-
-    const newRecord = {};
-    const columns = ast.columns || Object.keys(tableData.colunas);
-
-    if (ast.values.length !== columns.length) {
-      throw new Error('Número de valores não corresponde ao número de colunas');
-    }
-
-    for (let i = 0; i < columns.length; i++) {
-      const columnName = columns[i];
-      const value = this.evaluateExpression(ast.values[i], {});
-      
-      // Validar tipo
-      const columnType = tableData.colunas[columnName]?.['@tipo'];
-      if (columnType && !this.validateType(value, columnType)) {
-        throw new Error(`Tipo inválido para coluna '${columnName}'. Esperado: ${columnType}`);
-      }
-      
-      newRecord[columnName] = value;
-    }
-
-    // Gerar ID único para o registro
-    const nextId = Object.keys(tableData.registros || {}).length + 1;
-    tableData.registros = tableData.registros || {};
-    tableData.registros[`reg_${nextId}`] = newRecord;
-
-    await this.storageManager.saveTable(this.currentDatabase, ast.tableName, tableData);
-
-    return {
-      sucesso: true,
-      mensagem: `✅ Registro inserido na tabela '${ast.tableName}' com sucesso`
-    };
+  if (!this.currentDatabase) {
+    throw new Error('Nenhum banco selecionado');
   }
+
+  const tableData = await this.storageManager.loadTable(
+    this.currentDatabase, 
+    ast.tableName
+  );
+
+  if (!tableData) {
+    throw new Error(`Tabela '${ast.tableName}' não encontrada`);
+  }
+
+  const newRecord = {};
+  const columns = ast.columns || Object.keys(tableData.colunas);
+
+  // Preparar o registro básico
+  for (let i = 0; i < Math.min(ast.values.length, columns.length); i++) {
+    const columnName = columns[i];
+    const value = this.evaluateExpression(ast.values[i], {});
+    
+    // Verificar se coluna existe
+    if (!tableData.colunas[columnName]) {
+      throw new Error(`Coluna '${columnName}' não existe na tabela`);
+    }
+    
+    newRecord[columnName] = value;
+  }
+
+  // Usar o storage manager que já valida constraints
+  return await this.storageManager.insertRecord(
+    this.currentDatabase, 
+    ast.tableName, 
+    newRecord
+  );
+}
 
   async executeUpdate(ast) {
     if (!this.currentDatabase) {
@@ -463,17 +454,18 @@ class QueryExecutor {
     };
   }
 
-  async executeCreateTable(ast) {
-    if (!this.currentDatabase) {
-      throw new Error('Nenhum banco selecionado');
-    }
-
-    return await this.storageManager.createTable(
-      this.currentDatabase,
-      ast.tableName,
-      ast.columns
-    );
+async executeCreateTable(ast) {
+  if (!this.currentDatabase) {
+    throw new Error('Nenhum banco selecionado');
   }
+
+  return await this.storageManager.createTable(
+    this.currentDatabase,
+    ast.tableName,
+    ast.columns,
+    ast.tableConstraints || []
+  );
+}
 
   async executeCreateDatabase(ast) {
     return await this.storageManager.createDatabase(ast.databaseName);

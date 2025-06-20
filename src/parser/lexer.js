@@ -8,7 +8,7 @@ class Token {
 }
 
 const TokenType = {
-  // Palavras-chave
+  // Palavras-chave existentes
   SELECT: 'SELECT',
   FROM: 'FROM',
   WHERE: 'WHERE',
@@ -33,6 +33,18 @@ const TokenType = {
   TABLE: 'TABLE',
   DATABASE: 'DATABASE',
   USE: 'USE',
+  
+  // Novas palavras-chave para constraints
+  PRIMARY: 'PRIMARY',
+  KEY: 'KEY',
+  FOREIGN: 'FOREIGN',
+  REFERENCES: 'REFERENCES',
+  UNIQUE: 'UNIQUE',
+  AUTO: 'AUTO',
+  INCREMENT: 'INCREMENT',
+  NOT: 'NOT',
+  NULL: 'NULL',
+  DEFAULT: 'DEFAULT',
   
   // Operadores
   EQUALS: '=',
@@ -67,9 +79,11 @@ class Lexer {
     this.input = input.toLowerCase();
     this.position = 0;
     this.currentChar = this.input[this.position];
+    this.tokenHistory = [];
     
     // Palavras-chave em português
     this.keywords = {
+      // Palavras existentes
       'selecionar': TokenType.SELECT,
       'de': TokenType.FROM,
       'onde': TokenType.WHERE,
@@ -77,7 +91,7 @@ class Lexer {
       'interno': TokenType.INNER,
       'esquerda': TokenType.LEFT,
       'direita': TokenType.RIGHT,
-      'em': TokenType.ON,
+      'em': this.detectContextualEm.bind(this),
       'e': TokenType.AND,
       'ou': TokenType.OR,
       'ordenar': TokenType.ORDER,
@@ -93,8 +107,59 @@ class Lexer {
       'tabela': TokenType.TABLE,
       'banco': TokenType.DATABASE,
       'usar': TokenType.USE,
-      'como': TokenType.LIKE
+      'como': TokenType.LIKE,
+      
+      // Novas palavras para constraints
+      'primaria': TokenType.PRIMARY,
+      'chave': TokenType.KEY,
+      'estrangeira': TokenType.FOREIGN,
+      'referencia': TokenType.REFERENCES,
+      'unico': TokenType.UNIQUE,
+      'auto': TokenType.AUTO,
+      'incremento': TokenType.INCREMENT,
+      'nao': TokenType.NOT,
+      'nulo': TokenType.NULL,
+      'padrao': TokenType.DEFAULT,
+      
+      // Alternativas em inglês (para compatibilidade)
+      'primary': TokenType.PRIMARY,
+      'key': TokenType.KEY,
+      'foreign': TokenType.FOREIGN,
+      'references': TokenType.REFERENCES,
+      'unique': TokenType.UNIQUE,
+      'increment': TokenType.INCREMENT,
+      'not': TokenType.NOT,
+      'null': TokenType.NULL,
+      'default': TokenType.DEFAULT,
     };
+  }
+
+  // Função para detectar se "em" é ON (JOIN) ou INTO (INSERT)
+  detectContextualEm() {
+    const previousTokens = this.getRecentTokens(3);
+    
+    if (previousTokens.some(token => token && token.type === TokenType.INSERT)) {
+      return TokenType.INTO;
+    }
+    
+    if (previousTokens.some(token => token && token.type === TokenType.JOIN)) {
+      return TokenType.ON;
+    }
+    
+    return TokenType.INTO;
+  }
+
+  getRecentTokens(count) {
+    if (!this.tokenHistory) this.tokenHistory = [];
+    return this.tokenHistory.slice(-count);
+  }
+
+  addToHistory(token) {
+    if (!this.tokenHistory) this.tokenHistory = [];
+    this.tokenHistory.push(token);
+    if (this.tokenHistory.length > 10) {
+      this.tokenHistory.shift();
+    }
   }
 
   error(message) {
@@ -138,34 +203,20 @@ class Lexer {
   readString() {
     let result = '';
     const quote = this.currentChar;
-    this.advance(); // Skip opening quote
+    this.advance();
     
     while (this.currentChar && this.currentChar !== quote) {
       if (this.currentChar === '\\') {
         this.advance();
         if (this.currentChar) {
-          // Tratar caracteres de escape
           switch (this.currentChar) {
-            case 'n':
-              result += '\n';
-              break;
-            case 't':
-              result += '\t';
-              break;
-            case 'r':
-              result += '\r';
-              break;
-            case '\\':
-              result += '\\';
-              break;
-            case '"':
-              result += '"';
-              break;
-            case "'":
-              result += "'";
-              break;
-            default:
-              result += this.currentChar;
+            case 'n': result += '\n'; break;
+            case 't': result += '\t'; break;
+            case 'r': result += '\r'; break;
+            case '\\': result += '\\'; break;
+            case '"': result += '"'; break;
+            case "'": result += "'"; break;
+            default: result += this.currentChar;
           }
           this.advance();
         }
@@ -179,7 +230,7 @@ class Lexer {
       this.error('String não fechada');
     }
     
-    this.advance(); // Skip closing quote
+    this.advance();
     return result;
   }
 
@@ -200,36 +251,57 @@ class Lexer {
       }
 
       if (/\d/.test(this.currentChar)) {
-        return new Token(TokenType.NUMBER, this.readNumber(), this.position);
+        const token = new Token(TokenType.NUMBER, this.readNumber(), this.position);
+        this.addToHistory(token);
+        return token;
       }
 
       if (this.currentChar === "'" || this.currentChar === '"') {
-        return new Token(TokenType.STRING, this.readString(), this.position);
+        const token = new Token(TokenType.STRING, this.readString(), this.position);
+        this.addToHistory(token);
+        return token;
       }
 
       if (/[a-zA-Z_]/.test(this.currentChar)) {
         const identifier = this.readIdentifier();
-        const tokenType = this.keywords[identifier] || TokenType.IDENTIFIER;
-        return new Token(tokenType, identifier, this.position);
+        let tokenType = TokenType.IDENTIFIER;
+        
+        if (this.keywords[identifier]) {
+          if (typeof this.keywords[identifier] === 'function') {
+            tokenType = this.keywords[identifier]();
+          } else {
+            tokenType = this.keywords[identifier];
+          }
+        }
+        
+        const token = new Token(tokenType, identifier, this.position);
+        this.addToHistory(token);
+        return token;
       }
 
       // Operadores de dois caracteres
       if (this.currentChar === '!' && this.input[this.position + 1] === '=') {
         this.advance();
         this.advance();
-        return new Token(TokenType.NOT_EQUALS, '!=', this.position - 2);
+        const token = new Token(TokenType.NOT_EQUALS, '!=', this.position - 2);
+        this.addToHistory(token);
+        return token;
       }
 
       if (this.currentChar === '<' && this.input[this.position + 1] === '=') {
         this.advance();
         this.advance();
-        return new Token(TokenType.LESS_EQUAL, '<=', this.position - 2);
+        const token = new Token(TokenType.LESS_EQUAL, '<=', this.position - 2);
+        this.addToHistory(token);
+        return token;
       }
 
       if (this.currentChar === '>' && this.input[this.position + 1] === '=') {
         this.advance();
         this.advance();
-        return new Token(TokenType.GREATER_EQUAL, '>=', this.position - 2);
+        const token = new Token(TokenType.GREATER_EQUAL, '>=', this.position - 2);
+        this.addToHistory(token);
+        return token;
       }
 
       // Operadores de um caractere
@@ -250,7 +322,9 @@ class Lexer {
         const tokenType = singleCharTokens[this.currentChar];
         const currentChar = this.currentChar;
         this.advance();
-        return new Token(tokenType, currentChar, this.position - 1);
+        const token = new Token(tokenType, currentChar, this.position - 1);
+        this.addToHistory(token);
+        return token;
       }
 
       this.error(`Caractere inesperado: ${this.currentChar}`);
@@ -268,7 +342,7 @@ class Lexer {
       token = this.getNextToken();
     }
     
-    tokens.push(token); // EOF token
+    tokens.push(token);
     return tokens;
   }
 }

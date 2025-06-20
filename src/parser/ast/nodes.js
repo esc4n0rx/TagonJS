@@ -1,4 +1,4 @@
-// src/parser/ast/nodes.js (versão completa)
+// src/parser/ast/nodes.js (versão completa com as novas classes)
 
 class ASTNode {
   accept(visitor) {
@@ -10,6 +10,26 @@ class ASTNode {
   }
 }
 
+// Novo nó para constraints
+class ConstraintDefinition extends ASTNode {
+  constructor(type, options = {}) {
+    super();
+    this.type = type; // 'PRIMARY_KEY', 'FOREIGN_KEY', 'UNIQUE', 'NOT_NULL', 'AUTO_INCREMENT', 'DEFAULT'
+    this.options = options; // { referencedTable, referencedColumn, defaultValue, etc. }
+  }
+}
+
+// Novo nó para constraints de tabela (como FOREIGN KEY)
+class TableConstraint extends ASTNode {
+  constructor(type, columnName, options = {}) {
+    super();
+    this.type = type;
+    this.columnName = columnName;
+    this.options = options;
+  }
+}
+
+// Classes existentes...
 class SelectStatement extends ASTNode {
   constructor(selectList, fromClause, whereClause = null, joinClauses = [], orderByClause = null, groupByClause = null) {
     super();
@@ -25,7 +45,7 @@ class SelectStatement extends ASTNode {
 class SelectList extends ASTNode {
   constructor(columns) {
     super();
-    this.columns = columns; // Array de ColumnExpression
+    this.columns = columns;
   }
 }
 
@@ -40,7 +60,7 @@ class ColumnExpression extends ASTNode {
 class AllColumnsExpression extends ASTNode {
   constructor(tableName = null) {
     super();
-    this.tableName = tableName; // Para casos como "tabela.*"
+    this.tableName = tableName;
   }
 }
 
@@ -63,7 +83,7 @@ class FromClause extends ASTNode {
 class JoinClause extends ASTNode {
   constructor(joinType, tableName, onCondition, alias = null) {
     super();
-    this.joinType = joinType; // 'INNER', 'LEFT', 'RIGHT'
+    this.joinType = joinType;
     this.tableName = tableName;
     this.onCondition = onCondition;
     this.alias = alias;
@@ -90,14 +110,14 @@ class LiteralExpression extends ASTNode {
   constructor(value, type) {
     super();
     this.value = value;
-    this.type = type; // 'STRING', 'NUMBER', 'BOOLEAN'
+    this.type = type;
   }
 }
 
 class OrderByClause extends ASTNode {
   constructor(expressions) {
     super();
-    this.expressions = expressions; // Array de OrderByExpression
+    this.expressions = expressions;
   }
 }
 
@@ -105,7 +125,7 @@ class OrderByExpression extends ASTNode {
   constructor(expression, direction = 'ASC') {
     super();
     this.expression = expression;
-    this.direction = direction; // 'ASC' ou 'DESC'
+    this.direction = direction;
   }
 }
 
@@ -118,10 +138,11 @@ class GroupByClause extends ASTNode {
 
 // Comandos DDL
 class CreateTableStatement extends ASTNode {
-  constructor(tableName, columns) {
+  constructor(tableName, columns, tableConstraints = []) {
     super();
     this.tableName = tableName;
     this.columns = columns;
+    this.tableConstraints = tableConstraints;
   }
 }
 
@@ -132,12 +153,15 @@ class CreateDatabaseStatement extends ASTNode {
   }
 }
 
+// Atualizada para suportar constraints
 class ColumnDefinition extends ASTNode {
-  constructor(name, type, constraints = []) {
+  constructor(name, type, constraints = [], defaultValue = null, autoIncrement = false) {
     super();
     this.name = name;
     this.type = type;
     this.constraints = constraints;
+    this.defaultValue = defaultValue;
+    this.autoIncrement = autoIncrement;
   }
 }
 
@@ -176,7 +200,6 @@ class Assignment extends ASTNode {
   }
 }
 
-// Comandos de utilidade
 class UseDatabaseStatement extends ASTNode {
   constructor(databaseName) {
     super();
@@ -186,6 +209,10 @@ class UseDatabaseStatement extends ASTNode {
 
 module.exports = {
   ASTNode,
+  // Novos exports para constraints
+  ConstraintDefinition,
+  TableConstraint,
+  // Exports existentes
   SelectStatement,
   SelectList,
   ColumnExpression,

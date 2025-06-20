@@ -1,4 +1,3 @@
-// src/parser/parser.js
 const { TokenType } = require('./lexer');
 const {
   SelectStatement,
@@ -16,10 +15,13 @@ const {
   GroupByClause,
   CreateTableStatement,
   ColumnDefinition,
+  ConstraintDefinition,
+  TableConstraint,
   InsertStatement,
   UpdateStatement,
   DeleteStatement
 } = require('./ast/nodes');
+
 
 class Parser {
   constructor(tokens) {
@@ -379,68 +381,136 @@ class Parser {
     };
   }
 
-  parseCreateTableStatement() {
-    this.consume(TokenType.TABLE); // 'tabela'
-    const tableName = this.consume(TokenType.IDENTIFIER).value;
+parseCreateTableStatement() {
+  this.consume(TokenType.TABLE); // 'tabela'
+  const tableName = this.consume(TokenType.IDENTIFIER).value;
+  
+  this.consume(TokenType.OPEN_PAREN); // '('
+  
+  const columns = [];
+  const tableConstraints = [];
+  
+  do {
+    if (this.match(TokenType.PRIMARY, TokenType.FOREIGN, TokenType.UNIQUE)) {
+      // Parse table-level constraint
+      const constraint = this.parseTableConstraint();
+      tableConstraints.push(constraint);
+    } else {
+      // Parse column definition
+      const column = this.parseColumnDefinition();
+      columns.push(column);
+    }
     
+    if (this.match(TokenType.COMMA)) {
+      this.consume();
+    } else {
+      break;
+    }
+  } while (true);
+  
+  this.consume(TokenType.CLOSE_PAREN); // ')'
+  
+  return new CreateTableStatement(tableName, columns, tableConstraints);
+}
+
+parseColumnDefinition() {
+  const columnName = this.consume(TokenType.IDENTIFIER).value;
+  this.consume(TokenType.COLON); // ':'
+  const columnType = this.parseColumnType();
+  
+  const constraints = [];
+  let defaultValue = null;
+  let autoIncrement = false;
+  
+  // Parse column constraints
+  while (this.match(TokenType.PRIMARY, TokenType.UNIQUE, TokenType.NOT, TokenType.AUTO, TokenType.DEFAULT)) {
+    if (this.match(TokenType.PRIMARY)) {
+      this.consume(); // 'primaria' ou 'primary'
+      this.consume(TokenType.KEY); // 'chave' ou 'key'
+      constraints.push(new ConstraintDefinition('PRIMARY_KEY'));
+      
+    } else if (this.match(TokenType.UNIQUE)) {
+      this.consume(); // 'unico' ou 'unique'
+      constraints.push(new ConstraintDefinition('UNIQUE'));
+      
+    } else if (this.match(TokenType.NOT)) {
+      this.consume(); // 'nao' ou 'not'
+      this.consume(TokenType.NULL); // 'nulo' ou 'null'
+      constraints.push(new ConstraintDefinition('NOT_NULL'));
+      
+    } else if (this.match(TokenType.AUTO)) {
+      this.consume(); // 'auto'
+      this.consume(TokenType.INCREMENT); // 'incremento' ou 'increment'
+      autoIncrement = true;
+      constraints.push(new ConstraintDefinition('AUTO_INCREMENT'));
+      
+    } else if (this.match(TokenType.DEFAULT)) {
+      this.consume(); // 'padrao' ou 'default'
+      defaultValue = this.parseExpression();
+      constraints.push(new ConstraintDefinition('DEFAULT', { value: defaultValue }));
+    }
+  }
+  
+  return new ColumnDefinition(columnName, columnType, constraints, defaultValue, autoIncrement);
+}
+
+parseColumnType() {
+  const type = this.consume(TokenType.IDENTIFIER).value;
+  
+  // Suporte para tipos especiais
+  if (type === 'uuid') {
+    return 'uuid';
+  }
+  
+  // Suporte para tipos com tamanho (ex: texto(50))
+  if (this.match(TokenType.OPEN_PAREN)) {
+    this.consume(); // '('
+    const size = this.consume(TokenType.NUMBER).value;
+    this.consume(TokenType.CLOSE_PAREN); // ')'
+    return `${type}(${size})`;
+  }
+  
+  return type;
+}
+
+parseTableConstraint() {
+  if (this.match(TokenType.PRIMARY)) {
+    this.consume(); // 'primaria'
+    this.consume(TokenType.KEY); // 'chave'
     this.consume(TokenType.OPEN_PAREN); // '('
-    
-    const columns = [];
-    
-    do {
-      const columnName = this.consume(TokenType.IDENTIFIER).value;
-      this.consume(TokenType.COLON || ':'); // Assumindo que usamos ':'
-      const columnType = this.consume(TokenType.IDENTIFIER).value;
-      
-      const constraints = [];
-      
-      // Analisar constraints opcionais
-      while (this.match(TokenType.IDENTIFIER)) {
-        const constraint = this.getCurrentToken().value.toLowerCase();
-        if (['primary', 'unique', 'not', 'auto'].includes(constraint)) {
-          if (constraint === 'not') {
-            this.consume(); // 'not'
-            if (this.match(TokenType.IDENTIFIER) && 
-                this.getCurrentToken().value.toLowerCase() === 'null') {
-              this.consume(); // 'null'
-              constraints.push('NOT_NULL');
-            }
-          } else if (constraint === 'primary') {
-            this.consume(); // 'primary'
-            if (this.match(TokenType.IDENTIFIER) && 
-                this.getCurrentToken().value.toLowerCase() === 'key') {
-              this.consume(); // 'key'
-              constraints.push('PRIMARY_KEY');
-            }
-          } else if (constraint === 'auto') {
-            this.consume(); // 'auto'
-            if (this.match(TokenType.IDENTIFIER) && 
-                this.getCurrentToken().value.toLowerCase() === 'increment') {
-              this.consume(); // 'increment'
-              constraints.push('AUTO_INCREMENT');
-            }
-          } else {
-            constraints.push(constraint.toUpperCase());
-            this.consume();
-          }
-        } else {
-          break;
-        }
-      }
-      
-      columns.push(new ColumnDefinition(columnName, columnType, constraints));
-      
-      if (this.match(TokenType.COMMA)) {
-        this.consume();
-      } else {
-        break;
-      }
-    } while (true);
-    
+    const columnName = this.consume(TokenType.IDENTIFIER).value;
     this.consume(TokenType.CLOSE_PAREN); // ')'
     
-    return new CreateTableStatement(tableName, columns);
+    return new TableConstraint('PRIMARY_KEY', columnName);
+    
+  } else if (this.match(TokenType.FOREIGN)) {
+    this.consume(); // 'estrangeira'
+    this.consume(TokenType.KEY); // 'chave'
+    this.consume(TokenType.OPEN_PAREN); // '('
+    const columnName = this.consume(TokenType.IDENTIFIER).value;
+    this.consume(TokenType.CLOSE_PAREN); // ')'
+    this.consume(TokenType.REFERENCES); // 'referencia'
+    const referencedTable = this.consume(TokenType.IDENTIFIER).value;
+    this.consume(TokenType.OPEN_PAREN); // '('
+    const referencedColumn = this.consume(TokenType.IDENTIFIER).value;
+    this.consume(TokenType.CLOSE_PAREN); // ')'
+    
+    return new TableConstraint('FOREIGN_KEY', columnName, {
+      referencedTable,
+      referencedColumn
+    });
+    
+  } else if (this.match(TokenType.UNIQUE)) {
+    this.consume(); // 'unico'
+    this.consume(TokenType.OPEN_PAREN); // '('
+    const columnName = this.consume(TokenType.IDENTIFIER).value;
+    this.consume(TokenType.CLOSE_PAREN); // ')'
+    
+    return new TableConstraint('UNIQUE', columnName);
   }
+  
+  this.error('Constraint de tabela não reconhecida');
+}
 
   parseInsertStatement() {
     this.consume(TokenType.INSERT); // 'inserir'
