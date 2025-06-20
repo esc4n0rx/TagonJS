@@ -1,0 +1,17 @@
+{
+  "name": "tagonjs",
+  "version": "1.0.0", 
+  "description": "Sistema educativo de banco de dados com comandos em português simples",
+  "main": "src/cli.js",
+  "scripts": {
+    "start": "node src/cli.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["database", "xml", "cli", "educativo", "português"],
+  "author": "TagonJS",
+  "license": "MIT",
+  "dependencies": {
+    "fast-xml-parser": "^5.2.5",
+    "chalk": "^4.1.2"
+  }
+}
